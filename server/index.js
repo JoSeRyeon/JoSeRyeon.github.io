@@ -317,6 +317,8 @@ app.post('/viewExcel', (req, res) => {
 
 app.post('/searchHeader', async (req, res) => {
 
+  let headerCellList = [];
+
   try {
 
   let fileTest = [];
@@ -329,7 +331,7 @@ app.post('/searchHeader', async (req, res) => {
   const files = fileTest;
   let errorSheetList = [];
 
-  let headerCellList = [];
+  // let headerCellList = [];
   const searchKeyword = ["학교가", "행사가", "단위", "제품명", "품명", "규격", "유통기한"]
 
   for (const file of files) {
@@ -381,8 +383,8 @@ app.post('/searchHeader', async (req, res) => {
   return res.send(headerCellList);
 
 } catch(err) {
-  console.log(err)
-  return res.send([]);
+  // console.log(err)
+  return res.send(headerCellList);
 }
 
 });
