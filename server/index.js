@@ -217,30 +217,63 @@ app.post('/resetFileList', (req, res)=>{
 });
 
 
+// app.post('/fileList', async (req, res) => {
+
+//   try {
+//   let fileListResult = [];
+//   // 각 파일에서 시트명 추출
+//   const sheetNames = [];
+//   fileList.forEach((file) => {
+//     let filesSheets = [];
+//     const workbook = xlsx.readFile(path.join(__dirname, 'uploads', file));
+//     sheetNames.push(...workbook.SheetNames);
+//     filesSheets.push(...workbook.SheetNames)
+    
+//     fileListResult.push({fileName : path.basename(file), sheetList : filesSheets})
+//   });
+
+//   res.send(fileListResult);
+
+//   } catch (error) {
+//     res.send('Error: ');
+//   }
+
+// })
+
+
 app.post('/fileList', async (req, res) => {
 
-  // const files = fs.readdirSync(path.join(__dirname, 'uploads'));
-
+  try {
   let fileListResult = [];
+
+  let errorFileList = [];
+
   // 각 파일에서 시트명 추출
   const sheetNames = [];
+
+  let workbook = "";
   fileList.forEach((file) => {
     let filesSheets = [];
-    const workbook = xlsx.readFile(path.join(__dirname, 'uploads', file));
-    sheetNames.push(...workbook.SheetNames);
-    filesSheets.push(...workbook.SheetNames)
+    try {
+      workbook = xlsx.readFile(path.join(__dirname, 'uploads', file));
+
+      sheetNames.push(...workbook.SheetNames);
+      filesSheets.push(...workbook.SheetNames)
+      
+      fileListResult.push({fileName : path.basename(file), sheetList : filesSheets})
+
+    } catch (err){
+      errorFileList.push(path.basename(file));
+    }
     
-    fileListResult.push({fileName : path.basename(file), sheetList : filesSheets})
   });
 
+  res.send({successFiles : fileListResult, errorFiles : errorFileList});
 
-  // res.send({fileList : fileList , uniqueSheetNames : tt});
+  } catch (error) {
+    res.send('Error: ');
+  }
 
-  // res.send({fileList : fileListResult});
-  res.send(fileListResult);
-
-
-  // res.send(fileList);
 })
 
 
@@ -284,6 +317,7 @@ app.post('/viewExcel', (req, res) => {
 
 app.post('/searchHeader', async (req, res) => {
 
+  try {
 
   let fileTest = [];
   fileList.map((data) => {
@@ -323,7 +357,7 @@ app.post('/searchHeader', async (req, res) => {
           const cellRef = xlsx.utils.encode_cell(cellAddress);
           const cell = worksheet[cellRef];
   
-          if (cell && searchKeyword.includes(cell.v.toString().replace(/\s/g, ''))) {
+          if (cell && cell?.v && typeof(cell?.v) === 'string' && searchKeyword.includes(cell.v.toString().replace(/\s/g, ''))) {
             const rowNumber = R;
             const row = [];
   
@@ -344,53 +378,12 @@ app.post('/searchHeader', async (req, res) => {
     }
   }
 
-  // files.forEach(file => {
-  //   const workbook = xlsx.readFile(file);
-  //   const sheetNames = workbook.SheetNames;
-
-  //   sheetNames.forEach(async (sheetName) => {
-  //     const worksheet = workbook.Sheets[sheetName];
-  //     const range = xlsx.utils.decode_range(worksheet['!ref']);
-      
-
-
-  //     let headerCell = [];
-  //     let sheetInfo = {};
-
-
-  //     for (let R = range.s.r; R <= range.e.r; ++R) {
-  //       for (let C = range.s.c; C <= range.e.c; ++C) {
-  //         const cellAddress = { c: C, r: R + 1 };
-  //         const cellRef = xlsx.utils.encode_cell(cellAddress);
-  //         const cell = worksheet[cellRef];
-
-  //         if (cell && searchKeyword.includes(cell.v.toString().replace(/\s/g, ''))) {
-
-  //           const rowNumber = R; // 가져올 행 번호
-  //           const row = [];
-
-  //           for (let C = range.s.c; C <= range.e.c; ++C) {
-  //             const cellRef1 = xlsx.utils.encode_cell({ c: C, r: rowNumber + 1 });
-  //             const cell1 = worksheet[cellRef1];
-  //             if (cell1) {
-  //               row.push(cell1.v);
-  //             }
-  //           }
-  //           headerCell = row;
-  //           sheetInfo = { fileName: path.basename(file), sheetName: sheetName }
-
-  //         }
-  //       }
-  //     }
-
-
-  //     headerCellList.push({ headerCell: headerCell, sheetInfo: sheetInfo });
-
-  //   })
-  // })
-
-
   return res.send(headerCellList);
+
+} catch(err) {
+  console.log(err)
+  return res.send([]);
+}
 
 });
 
@@ -475,6 +468,7 @@ app.post('/search', async(req, res) => {
   //   console.log(req.body.selectedFileList)
   // }
 
+  const selectedSheetList = req.body.selectedSheetList;
   
   if(req.body.selectedFileList?.length > 0){
     let selectedFileList = req.body.selectedFileList;
@@ -502,7 +496,26 @@ app.post('/search', async(req, res) => {
     const workbook = xlsx.readFile(file);
     const sheetNames = workbook.SheetNames;
 
+
     for (const sheetName of sheetNames) {
+    
+      let foundSheetName = false; // sheetName을 찾았는지 여부를 저장하는 변수
+
+      if (selectedSheetList.length > 0) {
+
+        selectedSheetList.forEach((obj) => {
+          if (obj.key === sheetName) {
+            foundSheetName = true;
+          }
+        });
+
+        if (!foundSheetName) {
+          // sheetName을 찾지 못한 경우, 다음 시트로 넘어갑니다.
+          continue;
+        }
+
+      }
+
       const worksheet = workbook.Sheets[sheetName];
       // const range = xlsx.utils.decode_range(worksheet['!ref']);
       let range = null;
@@ -521,7 +534,7 @@ app.post('/search', async(req, res) => {
           const cellRef = xlsx.utils.encode_cell(cellAddress);
           const cell = worksheet[cellRef];
 
-          if (cell && cell.v.toString().includes(searchKeyword)) {
+          if (cell && cell?.v && typeof(cell?.v) === 'string' && cell.v.toString().includes(searchKeyword)) {
 
             const rowNumber = R; // 가져올 행 번호
             const row = [];
